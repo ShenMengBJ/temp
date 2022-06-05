@@ -41,10 +41,10 @@
 # 1.1. Internet ip address
 # 
 #
-Internet_IP="172.16.0.11"
-Internet_IP_RANGE="172.16.0.0/12"
-Internet_BCAST_ADRESS="172.31.255.255"
-Internet_IFACE="ens5"
+Internet_IP="10.0.2.6"
+Internet_IP_RANGE="10.0.2.6/24"
+Internet_BCAST_ADRESS="10.0.2.255"
+Internet_IFACE="enp0s9"
 
 ####
 # 1.2 Client network configuration.
@@ -54,10 +54,10 @@ Internet_IFACE="ens5"
 #
 # IP addresses of the client-side network
 #
-Client_NET_IP="192.168.0.3"
+Client_NET_IP="192.168.0.10"
 Client_NET_IP_RANGE="192.168.0.0/24"
 Client_NET_BCAST_ADRESS="192.168.0.255"
-Client_NET_IFACE="ens3"
+Client_NET_IFACE="enp0s3"
 
 ####
 # 1.3 Server Network Configuration.
@@ -66,27 +66,27 @@ Client_NET_IFACE="ens3"
 #
 # IP addresses of the server-side network
 #
-Server_NET_IP="10.0.0.6"
+Server_NET_IP="10.0.0.10"
 Server_NET_IP_RANGE="10.0.0.0/8"
 Server_NET_BCAST_ADRESS="10.255.255.255"
-Server_NET_IFACE="ens4"
+Server_NET_IFACE="enp0s8"
 
 #
 # IP aliases for the server (server's IP address)
 #
 LO_IFACE="lo"
 LO_IP="127.0.0.1"
-WEB_IP_ADDRESS="10.0.0.9"
-MAIL_IP_ADDRESS="10.0.0.9"
-SSH_IP_ADDRESS="10.0.0.9"
-DNS_IP_ADDRESS="10.0.0.9"
-FTP_IP_ADDRESS="10.0.0.9"
+WEB_IP_ADDRESS="10.0.0.10"
+#MAIL_IP_ADDRESS="10.0.0.9"
+SSH_IP_ADDRESS="10.0.0.10"
+#DNS_IP_ADDRESS="10.0.0.9"
+FTP_IP_ADDRESS="10.0.0.10"
 #IP aliases for NATed services (this is the GW's ip on client network)
-NAT_WEB_IP_ADDRESS="192.168.0.3"
-NAT_MAIL_IP_ADDRESS="192.168.0.3"
-NAT_SSH_IP_ADDRESS="192.168.0.3"
-NAT_DNS_IP_ADDRESS="192.168.0.3"
-NAT_FTP_IP_ADDRESS="192.168.0.3"
+NAT_WEB_IP_ADDRESS="192.168.0.100"
+#NAT_MAIL_IP_ADDRESS="192.168.0.3"
+NAT_SSH_IP_ADDRESS="192.168.0.100"
+#NAT_DNS_IP_ADDRESS="192.168.0.3"
+NAT_FTP_IP_ADDRESS="192.168.0.100"
 PASV_FTP_PORT_RANGE="30000:30099"
 
 ####
@@ -213,14 +213,14 @@ echo "1" > /proc/sys/net/ipv4/ip_forward
 #
 
 # Whitelist (Whitelist is preferred)
-#$IPTABLES -P INPUT DROP
-#$IPTABLES -P OUTPUT DROP
-#$IPTABLES -P FORWARD DROP
+$IPTABLES -P INPUT DROP
+$IPTABLES -P OUTPUT DROP
+$IPTABLES -P FORWARD DROP
 
 # Blacklist
-$IPTABLES -P INPUT ACCEPT
-$IPTABLES -P OUTPUT ACCEPT
-$IPTABLES -P FORWARD ACCEPT
+#$IPTABLES -P INPUT ACCEPT
+#$IPTABLES -P OUTPUT ACCEPT
+#$IPTABLES -P FORWARD ACCEPT
 
 #
 # 4.1.2 Create user-specified chains
@@ -273,6 +273,23 @@ $IPTABLES -P FORWARD ACCEPT
 #
 # Provide your forwarding rules below
 #
+#Server pings Client
+$IPTABLES -A FORWARD -s $Server_NET_IP -d $Client_NET_IP -p icmp --icmp 8 -j ACCEPT
+$IPTABLES -A FORWARD -s $Client_NET_IP -d $Server_NET_IP -p icmp --icmp 0 -j ACCEPT
+
+#vsFTP
+$IPTABLES -A FORWARD -p tcp -d $FTP_IP_ADDRESS --dport 21 -j ACCEPT
+$IPTABLES -A FORWARD -p tcp -d $FTP_IP_ADDRESS --dport $PASV_FTP_PORT_RANGE -j ACCEPT
+$IPTABLES -A FORWARD -p tcp -s $FTP_IP_ADDRESS --sport 21 -j ACCEPT
+$IPTABLES -A FORWARD -p tcp -s $FTP_IP_ADDRESS --sport $PASV_FTP_PORT_RANGE -j ACCEPT
+
+#SSH
+$IPTABLES -A FORWARD -p tcp -d $SSH_IP_ADDRESS --dport 22 -j ACCEPT
+$IPTABLES -A FORWARD -p tcp -s $SSH_IP_ADDRESS --sport 22 -j ACCEPT
+
+#HTTP
+$IPTABLES -A FORWARD -p tcp -d $WEB_IP_ADDRESS --dport 80 -j ACCEPT
+$IPTABLES -A FORWARD -p tcp -s $WEB_IP_ADDRESS --sport 80 -j ACCEPT
 
 # example of checking bad tcp packets
 #$IPTABLES -A FORWARD -p tcp -j bad_tcp_packets
@@ -292,7 +309,10 @@ $IPTABLES -P FORWARD ACCEPT
 #
 # Provide your input rules below
 #
-
+#Client pings Gateway
+$IPTABLES -A INPUT -s $Client_NET_IP -d $Client_NET_GW_IP -p icmp --icmp 8 -j ACCEPT 
+#Server pings Gateway
+$IPTABLES -A INPUT -s $Server_NET_IP -d $Server_NET_GW_IP -p icmp --icmp 8 -j ACCEPT 
 #
 # Example of checking bad TCP packets we don't want.
 #
@@ -306,6 +326,10 @@ $IPTABLES -P FORWARD ACCEPT
 #
 # Provide your output rules below
 #
+#Client pings Gateway
+$IPTABLES -A OUTPUT -s $Client_NET_GW_IP -d $Client_NET_IP -p icmp --icmp 0 -j ACCEPT
+#Server pings Gateway
+$IPTABLES -A OUTPUT -s $Server_NET_GW_IP -d $Server_NET_IP -p icmp --icmp 0 -j ACCEPT 
 
 #
 # Example of checking bad TCP packets we don't want.
@@ -326,6 +350,16 @@ $IPTABLES -P FORWARD ACCEPT
 # Provide your NAT PREROUTING rules (packets come into your private domain)
 #
 
+#vsFTP
+$IPTABLES -t nat -A PREROUTING -p tcp -d $NAT_FTP_IP_ADDRESS --dport 21 -j DNAT --to-destination $FTP_IP_ADDRESS
+$IPTABLES -t nat -A PREROUTING -p tcp -d $NAT_FTP_IP_ADDRESS --dport $PASV_FTP_PORT_RANGE -j DNAT --to-destination $FTP_IP_ADDRESS
+
+#SSH
+$IPTABLES -t nat -A PREROUTING -p tcp -d $NAT_SSH_IP_ADDRESS --dport 22 -j DNAT --to-destination $SSH_IP_ADDRESS
+
+#HTTP
+$IPTABLES -t nat -A PREROUTING -p tcp -d $NAT_WEB_IP_ADDRESS --dport 80 -j DNAT --to-destination $WEB_IP_ADDRESS
+
 #
 # Example of enable http to internal web server behind the firewall (port forwarding)
 #
@@ -339,11 +373,21 @@ $IPTABLES -P FORWARD ACCEPT
 # 5.2 POSTROUTING chain.
 #
 #
-# Provide your NAT PREROUTING rules (packets go to the public domain)
+# Provide your NAT POSTROUTING rules (packets go to the public domain)
 #
 
+#vsFTP
+$IPTABLES -t nat -A POSTROUTING -p tcp -s $FTP_IP_ADDRESS --sport 21 -j SNAT --to $NAT_FTP_IP_ADDRESS
+$IPTABLES -t nat -A POSTROUTING -p tcp -s $FTP_IP_ADDRESS --sport $PASV_FTP_PORT_RANGE -j SNAT --to $NAT_FTP_IP_ADDRESS
+
+#SSH
+$IPTABLES -t nat -A POSTROUTING -p tcp -s $SSH_IP_ADDRESS --sport 22 -j SNAT --to $NAT_SSH_IP_ADDRESS
+
+#HTTP
+$IPTABLES -t nat -A POSTROUTING -p tcp -s $WEB_IP_ADDRESS --sport 80 -j SNAT --to $NAT_WEB_IP_ADDRESS
+
 # Allow client and server network nodes to access to Internet using masquerade
-$IPTABLES -t nat -A POSTROUTING -o $Internet_IFACE -j MASQUERADE
+#$IPTABLES -t nat -A POSTROUTING -o $Internet_IFACE -j MASQUERADE
 
 # Allow the web server reply to the client go through the NAT 
 #$IPTABLES -t nat -A POSTROUTING -p tcp -s $WEB_IP_ADDRESS -o $Client_NET_IFACE --sport 80 -j SNAT --to $Client_NET_IP
