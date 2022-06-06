@@ -58,6 +58,7 @@ Client_NET_IP="192.168.0.10"
 Client_NET_IP_RANGE="192.168.0.0/24"
 Client_NET_BCAST_ADRESS="192.168.0.255"
 Client_NET_IFACE="enp0s3"
+Client_NET_GW_IP="192.168.0.100"
 
 ####
 # 1.3 Server Network Configuration.
@@ -70,6 +71,7 @@ Server_NET_IP="10.0.0.10"
 Server_NET_IP_RANGE="10.0.0.0/8"
 Server_NET_BCAST_ADRESS="10.255.255.255"
 Server_NET_IFACE="enp0s8"
+Server_NET_GW_IP="10.0.0.100"
 
 #
 # IP aliases for the server (server's IP address)
@@ -291,6 +293,10 @@ $IPTABLES -A FORWARD -p tcp -s $SSH_IP_ADDRESS --sport 22 -j ACCEPT
 $IPTABLES -A FORWARD -p tcp -d $WEB_IP_ADDRESS --dport 80 -j ACCEPT
 $IPTABLES -A FORWARD -p tcp -s $WEB_IP_ADDRESS --sport 80 -j ACCEPT
 
+#Server could reach Internet
+sudo iptables -A FORWARD -s $Server_NET_IP -o $Internet_IFACE -j ACCEPT
+sudo iptables -A FORWARD -d $Server_NET_IP -i $Internet_IFACE -j ACCEPT
+
 # example of checking bad tcp packets
 #$IPTABLES -A FORWARD -p tcp -j bad_tcp_packets
 
@@ -387,7 +393,7 @@ $IPTABLES -t nat -A POSTROUTING -p tcp -s $SSH_IP_ADDRESS --sport 22 -j SNAT --t
 $IPTABLES -t nat -A POSTROUTING -p tcp -s $WEB_IP_ADDRESS --sport 80 -j SNAT --to $NAT_WEB_IP_ADDRESS
 
 # Allow client and server network nodes to access to Internet using masquerade
-#$IPTABLES -t nat -A POSTROUTING -o $Internet_IFACE -j MASQUERADE
+$IPTABLES -t nat -A POSTROUTING -o $Internet_IFACE -j MASQUERADE
 
 # Allow the web server reply to the client go through the NAT 
 #$IPTABLES -t nat -A POSTROUTING -p tcp -s $WEB_IP_ADDRESS -o $Client_NET_IFACE --sport 80 -j SNAT --to $Client_NET_IP
